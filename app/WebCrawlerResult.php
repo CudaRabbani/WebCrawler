@@ -26,16 +26,12 @@ class WebCrawlerResult
     $this->title = $title;
   }
 
-  public function setUniqueImage($image) {
-    $this->uniqueImages = $image;
-  }
-
   public function getWordCounts() {
     return $this->wordCount;
   }
 
-  public function setStatusCode($code) {
-    $this->statusCode = $code;
+  public function getStatusCode() {
+    return $this->statusCode;
   }
 
   public function getLoadTime() {
@@ -58,19 +54,7 @@ class WebCrawlerResult
     return strlen($this->title);
   }
 
-  public function __toString(): string {
-    $countExternalLinks = is_array($this->uniqueExternalLinks) ? count($this->uniqueExternalLinks) : 0;
-    $countInternalLinks = is_array($this->uniqueInternalLinks) ? count($this->uniqueInternalLinks) : 0;
-    $countImages = is_array($this->uniqueImages) ? count($this->uniqueImages) : 0;
-    return "Page: $this->url<br>"
-      ."Unique External Links: $countExternalLinks<br>"
-      ."Unique Internal Links: $countInternalLinks<br>"
-      ."Unique Images: $countImages<br>"
-      ."Total Word Count: $this->wordCount<br>"
-      ."Load Time: $this->loadTime<br>"
-      ."HTTP Status: $this->statusCode<br>"
-      ."Title: $this->title<br>"
-      ."--------------------------------------------------<br>";
+  public function getURL() {
+    return $this->url;
   }
-
 }

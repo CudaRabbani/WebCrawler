@@ -9,12 +9,12 @@ use App\WebCrawlerResult;
 
 class WebCrawler
 {
-  protected $_url;
-  protected $_depth;
-  protected $_host;
-  protected $_useHttpAuth = false;
-  protected $_seen = array();
-  protected $_filter = array();
+  private $url;
+  private $depth;
+  private $host;
+  private $useHttpAuth = false;
+  private $seen = array();
+  private $_filter = array();
   private $uniqueImages;
 
   private $unique_internal_links;
@@ -29,10 +29,10 @@ class WebCrawler
 
   public function __construct($url, $depth = 5)
   {
-    $this->_url = $url;
-    $this->_depth = $depth;
+    $this->url = $url;
+    $this->depth = $depth;
     $parse = parse_url($url);
-    $this->_host = $parse['host'];
+    $this->host = $parse['host'];
     $this->unique_internal_links = [];
     $this->unique_external_links = [];
     $this->uniqueImages = [];
@@ -67,10 +67,10 @@ class WebCrawler
 
   private function countWordsInPage($url) {
     $pageText = @file_get_contents($url);
-    $search = array('@<script[^>]*?>.*?</script>@si',  // Strip out javascript
+    $search = array('@<script[^>]*?>.*?</script>@si',
 //      '@<head>.*?</head>@siU',            // Lose the head section
-      '@<style[^>]*?>.*?</style>@siU',    // Strip style tags properly
-      '@<![\s\S]*?--[ \t\n\r]*>@'         // Strip multi-line comments including CDATA
+      '@<style[^>]*?>.*?</style>@siU',
+      '@<![\s\S]*?--[ \t\n\r]*>@'
     );
 
     $contents = preg_replace($search, '', $pageText);
@@ -84,7 +84,7 @@ class WebCrawler
     return $anchors->item(0)->nodeValue;
   }
 
-  protected function processLink($content, $url, $depth, $httpcode, $time)
+  private function processLink($content, $url, $depth, $httpcode, $time)
   {
     $dom = new DOMDocument('1.0');
     @$dom->loadHTML($content);
@@ -145,42 +145,27 @@ class WebCrawler
     }
   }
 
-  protected function _getContent($url)
+  private function getContent($url)
   {
     $handle = curl_init($url);
-    if ($this->_useHttpAuth) {
+    if ($this->useHttpAuth) {
       curl_setopt($handle, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
       curl_setopt($handle, CURLOPT_USERPWD, $this->_user . ":" . $this->_pass);
     }
     curl_setopt($handle, CURLOPT_RETURNTRANSFER, TRUE);
-
-    /* Get the HTML or whatever is linked in $url. */
     $response = curl_exec($handle);
-    // response total time
     $time = curl_getinfo($handle, CURLINFO_TOTAL_TIME);
-    /* Check for 404 (file not found). */
     $httpCode = curl_getinfo($handle, CURLINFO_HTTP_CODE);
-
     curl_close($handle);
+
     return array($response, $httpCode, $time);
   }
 
-  protected function _printResult($url, $depth, $httpcode, $time)
+  private function isValid($url, $depth)
   {
-    ob_end_flush();
-    $currentDepth = $this->_depth - $depth;
-    $count = count($this->_seen);
-    $this->counter++;
-    //echo "N::$count,CODE::$httpcode,TIME::$time,DEPTH::$currentDepth URL::$url <br>";
-    ob_start();
-    flush();
-  }
-
-  protected function isValid($url, $depth)
-  {
-    if (strpos($url, $this->_host) === false
+    if (strpos($url, $this->host) === false
       || $depth === 0
-      || isset($this->_seen[$url])
+      || isset($this->seen[$url])
     ) {
       return false;
     }
@@ -197,72 +182,9 @@ class WebCrawler
     if (!$this->isValid($url, $depth)) {
       return;
     }
-    $this->_seen[$url] = true;
-    list($content, $httpcode, $time) = $this->_getContent($url);
-    $this->_printResult($url, $depth, $httpcode, $time);
+    $this->seen[$url] = true;
+    list($content, $httpcode, $time) = $this->getContent($url);
     $this->processLink($content, $url, $depth, $httpcode, $time);
-  }
-
-  private function countUniqueInternalLinks() {
-    $uniqueInternalLinks = [];
-    foreach ($this->result as $result) {
-      $internalLinks = $result->getInternalLinks();
-      if (!is_null($internalLinks)) {
-        array_push($uniqueInternalLinks, array_values($internalLinks));
-      }
-
-    }
-    $flat = collect($uniqueInternalLinks)->flatten()->all();
-    $count = array_count_values($flat);
-    $internalLinkCounter = 0;
-
-    foreach ($count as $key => $value) {
-      if ($value === 1) {
-        $internalLinkCounter++;
-      }
-    }
-    return $internalLinkCounter;
-  }
-
-  private function countUniqueImages() {
-    $uniqueImages = [];
-    foreach ($this->result as $result) {
-      $images = $result->getImages();
-      if (!is_null($images)) {
-        array_push($uniqueImages, array_values($images));
-      }
-    }
-
-    $flat = collect($uniqueImages)->flatten()->all();
-    $count = array_count_values($flat);
-    $imageCounter = 0;
-
-    foreach ($count as $key => $value) {
-      if ($value === 1) {
-        $imageCounter++;
-      }
-    }
-    return $imageCounter;
-  }
-
-  private function countUniqueExternalLinks () {
-    $uniqueExternalLinks = [];
-    foreach ($this->result as $result) {
-      $t = $result->getExternalLinks();
-      if (!is_null($t)) {
-        array_push($uniqueExternalLinks, array_values($t));
-      }
-
-    }
-    $flat = collect($uniqueExternalLinks)->flatten()->all();
-    $count = array_count_values($flat);
-    $externalLinkCounter = 0;
-    foreach ($count as $key => $value) {
-      if ($value === 1) {
-        $externalLinkCounter++;
-      }
-    }
-    return $externalLinkCounter;
   }
 
   private function countUniqueItems($item) {
@@ -290,61 +212,59 @@ class WebCrawler
 
     $flat = collect($itemList)->flatten()->all();
     $countItems = array_count_values($flat);
-    $counter = 0;
-    foreach ($countItems as $key => $value) {
-      if ($value === 1) {
-        $counter++;
+
+    $countItems = array_filter($countItems, function($value) {
+      return $value === 1;
+    });
+
+    return count($countItems);
+  }
+
+  private function calculateItemAverage($item) {
+    $total = 0;
+    foreach ($this->result as $result) {
+      switch ($item) {
+        case 'pageLoad':
+          $total += $result->getLoadTime();
+          break;
+        case 'wordCount':
+          $total += $result->getWordCounts();
+          break;
+        case 'titleLength':
+          $total += $result->getTitleLength();
+          break;
       }
     }
-
-    return $counter;
+    return $total/count($this->result);
   }
 
-  private function countAvgPageLoad() {
-    $totalTime = 0;
+  public function getScrawledPageWithStatusCode() {
+    $allResult = [];
+    $counter = 0;
     foreach ($this->result as $result) {
-      $totalTime += $result->getLoadTime();
+      $data['id'] = ++$counter;
+      $data['url'] = $result->getURL();
+      $data['status_code'] = $result->getStatusCode();
+      $data['avg_load_time'] = $result->getLoadTime();
+      $allResult[] = $data;
     }
 
-    return $totalTime/count($this->result);
-  }
-
-  private function countAvgWord() {
-    $totalWord = 0;
-    foreach ($this->result as $result) {
-      $totalWord += $result->getWordCounts();
-    }
-
-    return $totalWord/count($this->result);
-  }
-
-  private function countAvgTitleLength() {
-    $totalTitle = 0;
-    foreach ($this->result as $result) {
-      $totalTitle += $result->getTitleLength();
-    }
-
-    return $totalTitle/count($this->result);
+    return $allResult;
   }
 
   public function run()
   {
-    $this->crawl_page($this->_url, $this->_depth);
+    $this->crawl_page($this->url, $this->depth);
     $data = [];
     $data['total_pages'] = count($this->result);
-/*    $data['unique_internal_links'] = $this->countUniqueInternalLinks();
-    $data['unique_external_links'] = $this->countUniqueExternalLinks();
-    $data['unique_images'] = $this->countUniqueImages();*/
     $data['unique_internal_links'] = $this->countUniqueItems('internalLink');
     $data['unique_external_links'] = $this->countUniqueItems('externalLink');
     $data['unique_images'] = $this->countUniqueItems('image');
-    $data['avg_page_load'] = $this->countAvgPageLoad();
-    $data['avg_word_count'] = $this->countAvgWord();
-    $data['avg_title_length'] = $this->countAvgTitleLength();
-    echo "<br>The End<br>";
-    print_r($data);
+    $data['avg_page_load'] = $this->calculateItemAverage('pageLoad');
+    $data['avg_word_count'] = $this->calculateItemAverage('wordCount');
+    $data['avg_title_length'] = $this->calculateItemAverage('titleLength');
 
-    return $this->result;
+    return $data;
   }
 
 }
